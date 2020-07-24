@@ -14,7 +14,7 @@ This is only a usage example, and does not imply on how to correctly and safely 
 
 ### As a participant 
 
-Join the raffle:
+#### Join the raffle
 
 To join, you simply submit a `join` transaction, and choose a lucky phrase or number (and keep it secret!). This will be used as entropy for the required randomness.
 
@@ -29,17 +29,17 @@ For example:
 
 ### As a raffle host
 
-Store the contract on-chain:
+### Store the contract on-chain
 ```bash
 secretcli tx compute store contract.wasm.gz --from account --gas auto
 ```
 
-Instantiate contract:
+#### Instantiate contract
 ```bash
 secretcli tx compute instantiate <code_id> '{"seed": "<some long secret here>"}' --label <label> --from account
 ```
 
-End lottery:
+#### End raffle - will select a winner
 ```bash
 secretcli tx compute execute <contract-address> '{ "end_lottery": {} }' --from account
 ```
