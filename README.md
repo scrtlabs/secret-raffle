@@ -16,7 +16,7 @@ This is only a usage example, and does not imply on how to correctly and safely 
 
 Join the raffle:
 
-To join, you simply submit a `join` transaction, and choose a lucky phrase or number (and keep it secret!) 
+To join, you simply submit a `join` transaction, and choose a lucky phrase or number (and keep it secret!). This will be used as entropy for the required randomness.
 
 ```bash
 secretcli tx compute execute <contract-address> '{ "join": { "phrase": "<write something fun here>" }}' --from account
