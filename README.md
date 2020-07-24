@@ -1,4 +1,4 @@
-# Secret Lottery
+# Secret Raffle
 
 ## Description
 This is a simple raffle game. The 'Raffle Host' will deploy an instance of this contract. 
