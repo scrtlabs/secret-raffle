@@ -114,15 +114,21 @@ fn end_lottery<S: Storage, A: Api, Q: Querier>(
 
     let mut state = config(&mut deps.storage).load()?;
 
-    if state.winner != CanonicalAddr::default() {
-        // game already ended
-        return Ok(HandleResponse::default());
-    }
+    // add this if you don't want to allow choosing an alternative winner
+    // if state.winner != CanonicalAddr::default() {
+    //     // game already ended
+    //     return Ok(HandleResponse::default());
+    // }
+
     if env.message.sender != state.contract_owner {
         // game already ended
         return Err(throw_gen_err("You cannot trigger lottery end unless you're the owner!".to_string()));
     }
     // let contract_addr: HumanAddr = deps.api.human_address(&env.contract.address)?;
+
+    // this way every time we call the end_lottery function we will get a different result. Plus it's going to be pretty hard to
+    // predict the exact time of the block, so less chance of cheating
+    state.entropy.extend_from_slice(&env.block.time.to_be_bytes());
 
     let mut rng: Prng = Prng::new(&state.seed, &state.entropy);
 
