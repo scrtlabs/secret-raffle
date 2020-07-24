@@ -28,13 +28,13 @@ For example:
 * wrong: `5`
 
 #### Did I join?
-
+Check if an address was successfully entered in the raffle
 ```
 secretcli q compute contract-state smart <contract-address> '{"registered": {"address": "<your address>"}}'
 ```
 
 #### See who won
-
+See who was selected as the winner
 ```
 secretcli q compute contract-state smart <contract-address> '{"winner": {}}'
 ```
