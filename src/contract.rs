@@ -1,50 +1,25 @@
-use cosmwasm_std::{
-    coin, to_binary, Api, BankMsg, Binary, CanonicalAddr, Coin, CosmosMsg, Env, Extern,
-    HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, Uint128,
-};
-use lazy_static::lazy_static;
-
+use cosmwasm_std::{Api, Binary, CanonicalAddr, Env, Extern, HandleResponse, HumanAddr, InitResponse, Querier, StdError, StdResult, Storage, QueryResponse, log};
+use crate::rand::Prng;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
-use crate::state::{config, config_read, State, Ticket, USCRT_DENOM};
-
-lazy_static! {
-    static ref ZERO_ADDRESS: CanonicalAddr = CanonicalAddr(Binary(vec![0; 8]));
-}
+use crate::state::{config, config_read, State};
 
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
     msg: InitMsg,
 ) -> StdResult<InitResponse> {
-    if env.message.sent_funds.is_empty() {
-        return Err(throw_gen_err(format!("You have to send a winning prize")));
-    }
 
     // Init msg.item_count items
-    let mut items = Vec::<Ticket>::new();
-    for i in 0..msg.ticket_count {
-        items.push(Ticket {
-            id: i,
-            value: coin(1, USCRT_DENOM.clone()),
-            owner: env.contract.address.clone(),
-            approved: Vec::<CanonicalAddr>::new(),
-        });
-    }
+    let items: Vec<CanonicalAddr> = Vec::default();
 
-    // Building the winning representation as a coin
-    let winning_prize = Coin {
-        denom: USCRT_DENOM.to_string(),
-        amount: env.message.sent_funds[0].amount,
-    };
-
-    items[msg.golden as usize].value = winning_prize.clone();
-
-    // Create state
+    //Create state
     let state = State {
         items,
-        contract_owner: env.message.sender.clone(),
-        winning_prize: winning_prize.clone(),
-        deposit: env.message.sent_funds[0].amount,
+        contract_owner: env.message.sender,
+        seed: msg.seed.as_bytes().to_vec(),
+        entropy: Vec::default(),
+        start_time: env.block.time,
+        winner: CanonicalAddr::default()
     };
 
     // Save to state
@@ -59,11 +34,8 @@ pub fn handle<S: Storage, A: Api, Q: Querier>(
     msg: HandleMsg,
 ) -> StdResult<HandleResponse> {
     match msg {
-        HandleMsg::SafeTransferFrom { from, to, ticket_id } => {
-            safe_transfer_from(deps, env, &from, &to, ticket_id)
-        }
-        HandleMsg::BuyTicket { ticket_id } => buy_ticket(deps, env, ticket_id),
         HandleMsg::EndLottery {} => end_lottery(deps, env),
+        HandleMsg::Join { phrase } => {register(deps, env, phrase)}
     }
 }
 
@@ -72,8 +44,8 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
     msg: QueryMsg,
 ) -> StdResult<Binary> {
     match msg {
-        QueryMsg::BalanceOf { owner } => to_binary(&balance_of(deps, &owner)),
-        QueryMsg::OwnerOf { ticket_id } => to_binary(&owner_of(deps, ticket_id)),
+        QueryMsg::Joined { address } => query_registered(deps, address),
+        QueryMsg::Winner {} => query_winner(deps)
     }
 }
 
@@ -84,56 +56,54 @@ fn throw_gen_err(msg: String) -> StdError {
     }
 }
 
-fn is_owner_or_approved(item: &Ticket, addr: &CanonicalAddr) -> bool {
-    addr == &item.owner || item.approved.clone().iter().any(|i| i == addr)
-}
-
-fn is_token_id_valid(token_id: u32, state: &State) -> bool {
-    (token_id as usize) < state.items.len()
-}
-
-fn perform_transfer<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    to: &CanonicalAddr,
-    token_id: u32,
-) -> StdResult<State> {
-    config(&mut deps.storage).update(|mut state| {
-        state.items[token_id as usize].owner = to.clone();
-        Ok(state)
-    })
-}
-
-fn buy_ticket<S: Storage, A: Api, Q: Querier>(
+fn register<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
-    token_id: u32,
+    phrase: String
 ) -> StdResult<HandleResponse> {
-    if env.message.sent_funds.is_empty() {
-        return Err(throw_gen_err(format!("You can't get tickets for free!")));
-    }
-    let sent_funds: Coin = env.message.sent_funds[0].clone();
+    let mut state = config(&mut deps.storage).load()?;
 
-    // TODO min entry price in state
-    if sent_funds.amount.u128() < 1 {
-        return Err(throw_gen_err(format!(
-            "You sent {:?} funds, it is not enough!",
-            sent_funds.amount
-        )));
+    if state.items.contains(&env.message.sender) {
+        return Err(throw_gen_err(format!("Address {} is already registered", deps.api.human_address(&env.message.sender)?) ));
     }
 
-    config(&mut deps.storage).update(|mut state| {
-        state.deposit.0 += 1;
-        Ok(state)
-    })?;
+    state.items.push(env.message.sender.clone());
+    state.entropy.extend_from_slice(phrase.as_bytes());
+    state.entropy.extend_from_slice(&env.block.height.to_be_bytes());
+    state.entropy.extend_from_slice(&env.block.time.to_be_bytes());
 
-    // Transfer coin to buyer
-    perform_transfer(deps, &env.message.sender, token_id)?;
+    // Save state
+    config(&mut deps.storage).save(&state)?;
 
-    Ok(HandleResponse {
-        messages: vec![],
-        log: vec![],
-        data: None,
-    })
+    Ok(HandleResponse::default())
+}
+
+fn query_registered<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    address: HumanAddr,
+) -> StdResult<QueryResponse> {
+    let state = config_read(&deps.storage).load()?;
+
+    let addr = deps.api.canonical_address(&address)?;
+
+    if state.items.contains(&addr) {
+        Ok(Binary(Vec::from(format!("{} is registered", address))))
+    } else {
+        Ok(Binary(Vec::from(format!("{} is not registered", address))))
+    }
+}
+
+fn query_winner<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+) -> StdResult<QueryResponse> {
+    let state = config_read(&deps.storage).load()?;
+
+    if state.winner != CanonicalAddr::default() {
+        let winner_readable = deps.api.human_address(&state.winner)?;
+        Ok(Binary(Vec::from(format!("{} was the winner", winner_readable))))
+    } else {
+        Ok(Binary(Vec::from(format!("Winner not selected yet!"))))
+    }
 }
 
 fn end_lottery<S: Storage, A: Api, Q: Querier>(
@@ -143,302 +113,34 @@ fn end_lottery<S: Storage, A: Api, Q: Querier>(
     // TODO Check if contract has expired
 
     let mut state = config(&mut deps.storage).load()?;
-    let mut messages: Vec<CosmosMsg> = vec![];
-    let contract_addr: HumanAddr = deps.api.human_address(&env.contract.address)?;
 
-    for item in state.items.clone() {
-        let to: HumanAddr = deps.api.human_address(&item.owner)?;
+    if state.winner != CanonicalAddr::default() {
+        // game already ended
+        return Ok(HandleResponse::default());
+    }
+    if env.message.sender != state.contract_owner {
+        // game already ended
+        return Err(throw_gen_err("You cannot trigger lottery end unless you're the owner!".to_string()));
+    }
+    // let contract_addr: HumanAddr = deps.api.human_address(&env.contract.address)?;
 
-        if to == contract_addr {
-            continue;
-        }
+    let mut rng: Prng = Prng::new(&state.seed, &state.entropy);
 
-        messages.push(CosmosMsg::Bank(BankMsg::Send {
-            from_address: contract_addr.clone(),
-            to_address: to.clone(),
-            amount: vec![item.value.clone()],
-        }));
+    let winner = rng.select_one_of(state.items.clone().into_iter());
 
-        state.deposit.0 -= item.value.amount.u128();
-        state.items[item.id as usize].owner = (*ZERO_ADDRESS).clone();
+    if winner.is_none() {
+        return Err(throw_gen_err(format!("Fucking address is empty wtf")));
     }
 
-    let owner_addr = deps.api.human_address(&state.contract_owner)?;
+    state.winner =  winner.unwrap().clone();
 
-    // If anything left in the deposit, return to contract owner
-    if state.deposit.u128() > 0 {
-        messages.push(CosmosMsg::Bank(BankMsg::Send {
-            from_address: contract_addr.clone(),
-            to_address: owner_addr,
-            amount: vec![Coin {
-                denom: USCRT_DENOM.to_string(),
-                amount: state.deposit,
-            }],
-        }));
-    }
-
-    // Save state
     config(&mut deps.storage).save(&state)?;
 
-    // TODO mark lottery as ended
+    let winner_readable = deps.api.human_address(&state.winner)?;
 
     Ok(HandleResponse {
-        messages,
-        log: vec![],
+        messages: vec![],
+        log: vec![log("winner", format!("{}", winner_readable))],
         data: None,
     })
-}
-
-// ERC-721 interface
-
-/// @dev This emits when ownership of any NFT changes by any mechanism.
-///  This event emits when NFTs are created (`from` == 0) and destroyed
-///  (`to` == 0). Exception: during contract creation, any number of NFTs
-///  may be created and assigned without emitting Transfer. At the time of
-///  any transfer, the approved address for that NFT (if any) is reset to none.
-// fn transfer(from: CanonicalAddr, to: CanonicalAddr, token_id: u32) {
-//     unimplemented!()
-// }
-
-/// @dev This emits when the approved address for an NFT is changed or
-///  reaffirmed. The zero address indicates there is no approved address.
-///  When a Transfer event emits, this also indicates that the approved
-///  address for that NFT (if any) is reset to none.
-// event Approval(address indexed _owner, address indexed _approved, uint256 indexed _tokenId);
-
-/// @dev This emits when an operator is enabled or disabled for an owner.
-///  The operator can manage all NFTs of the owner.
-// event ApprovalForAll(address indexed _owner, address indexed _operator, bool _approved);
-
-/// @notice Count all NFTs assigned to an owner
-/// @dev NFTs assigned to the zero address are considered invalid, and this
-///  function throws for queries about the zero address.
-/// @param _owner An address for whom to query the balance
-/// @return The number of NFTs owned by `_owner`, possibly zero
-fn balance_of<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    owner: &HumanAddr,
-) -> StdResult<u32> {
-    let owner_addr_raw = deps.api.canonical_address(&owner)?;
-
-    if owner_addr_raw == *ZERO_ADDRESS {
-        return Err(throw_gen_err("Can't query the zero address!".to_string()));
-    }
-
-    let state = config_read(&deps.storage).load()?;
-    let mut count = 0;
-
-    for item in state.items {
-        if item.owner == owner_addr_raw {
-            count = count + 1;
-        }
-    }
-
-    Ok(count)
-}
-
-/// @notice Find the owner of an NFT
-/// @dev NFTs assigned to zero address are considered invalid, and queries
-///  about them do throw.
-/// @param _tokenId The identifier for an NFT
-/// @return The address of the owner of the NFT
-fn owner_of<S: Storage, A: Api, Q: Querier>(
-    deps: &Extern<S, A, Q>,
-    token_id: u32,
-) -> StdResult<HumanAddr> {
-    let state = config_read(&deps.storage).load()?;
-
-    // Check to not go out of bounds
-    if !is_token_id_valid(token_id, &state) {
-        return Err(throw_gen_err(format!(
-            "Item {:?} does not exist!",
-            token_id
-        )));
-    }
-
-    let owner_addr_raw = state.items[token_id as usize].owner.clone();
-
-    // Check if item has been redeemed
-    if owner_addr_raw == *ZERO_ADDRESS {
-        return Err(throw_gen_err(format!(
-            "Item {:?} has been redeemed already!",
-            token_id
-        )));
-    }
-
-    deps.api.human_address(&owner_addr_raw)
-}
-
-/// @notice Transfers the ownership of an NFT from one address to another address
-/// @dev Throws unless `msg.sender` is the current owner, an authorized
-///  operator, or the approved address for this NFT. Throws if `_from` is
-///  not the current owner. Throws if `_to` is the zero address. Throws if
-///  `_tokenId` is not a valid NFT. When transfer is complete, this function
-///  checks if `_to` is a smart contract (code size > 0). If so, it calls
-///  `onERC721Received` on `_to` and throws if the return value is not
-///  `bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"))`.
-/// @param _from The current owner of the NFT
-/// @param _to The new owner
-/// @param _tokenId The NFT to transfer
-/// @param data Additional data with no specified format, sent in call to `_to`
-fn safe_transfer_from_with_data<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    from: &HumanAddr,
-    to: &HumanAddr,
-    token_id: u32,
-    data: Vec<u8>,
-) -> StdResult<HandleResponse> {
-    // Canonicalize addrs
-    let from_addr_raw = deps.api.canonical_address(from)?;
-    let to_addr_raw = deps.api.canonical_address(to)?;
-
-    // Throw if `to` is the zero address
-    if to_addr_raw == *ZERO_ADDRESS {
-        return Err(throw_gen_err(format!(
-            "Can't burn Items with `safe_transfer_from` function. To burn an Item, use the unsafe `transfer_ftom`"        )));
-    }
-
-    // Get item from state
-    let state = config_read(&mut deps.storage).load()?;
-    let item = state.items[token_id as usize].clone();
-
-    // Check if owner or approved
-    if !is_owner_or_approved(&item, &env.message.sender) {
-        return Err(StdError::Unauthorized { backtrace: None });
-    }
-
-    // From has to be the owner
-    if from_addr_raw != item.owner {
-        return Err(throw_gen_err(format!(
-            "{:?} is not the owner of {:?} Item!",
-            from, token_id
-        )));
-    }
-
-    if !is_token_id_valid(token_id, &state) {
-        return Err(throw_gen_err(format!(
-            "Item {:?} does not exist!",
-            token_id
-        )));
-    }
-
-    // Perform transfer
-    match perform_transfer(deps, &to_addr_raw, token_id) {
-        Ok(_) => Ok(HandleResponse {
-            messages: vec![],
-            log: vec![],
-            data: Some(Binary(data.to_vec())),
-        }),
-        Err(e) => {
-            return Err(throw_gen_err(format!(
-                "Error transferring Item {:?}: {:?}",
-                token_id, e
-            )))
-        }
-    }
-}
-
-/// @notice Transfers the ownership of an NFT from one address to another address
-/// @dev This works identically to the other function with an extra data parameter,
-///  except this function just sets data to "".
-/// @param _from The current owner of the NFT
-/// @param _to The new owner
-/// @param _tokenId The NFT to transfer
-fn safe_transfer_from<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    from: &HumanAddr,
-    to: &HumanAddr,
-    token_id: u32,
-) -> StdResult<HandleResponse> {
-    safe_transfer_from_with_data(deps, env, from, to, token_id, vec![])
-}
-
-/// @notice Transfer ownership of an NFT -- THE CALLER IS RESPONSIBLE
-///  TO CONFIRM THAT `_to` IS CAPABLE OF RECEIVING NFTS OR ELSE
-///  THEY MAY BE PERMANENTLY LOST
-/// @dev Throws unless `msg.sender` is the current owner, an authorized
-///  operator, or the approved address for this NFT. Throws if `_from` is
-///  not the current owner. Throws if `_to` is the zero address. Throws if
-///  `_tokenId` is not a valid NFT.
-/// @param _from The current owner of the NFT
-/// @param _to The new owner
-/// @param _tokenId The NFT to transfer
-fn transfer_from<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    from: &HumanAddr,
-    to: &HumanAddr,
-    token_id: u32,
-) -> StdResult<HandleResponse> {
-    // Currently it's the same implementation
-    safe_transfer_from(deps, env, from, to, token_id)
-}
-
-/// @notice Change or reaffirm the approved address for an NFT
-/// @dev The zero address indicates there is no approved address.
-///  Throws unless `msg.sender` is the current NFT owner, or an authorized
-///  operator of the current owner.
-/// @param _approved The new approved NFT controller
-/// @param _tokenId The NFT to approve
-fn approve<S: Storage, A: Api, Q: Querier>(
-    deps: &mut Extern<S, A, Q>,
-    env: Env,
-    approved: CanonicalAddr,
-    token_id: u32,
-) -> StdResult<HandleResponse> {
-    let mut state = config(&mut deps.storage).load()?;
-
-    if !is_token_id_valid(token_id, &state) {
-        return Err(throw_gen_err(format!(
-            "Item {:?} does not exist!",
-            token_id
-        )));
-    }
-
-    let mut item = state.items[token_id as usize].clone();
-
-    // Check if owner or approved
-    if !is_owner_or_approved(&item, &env.message.sender) {
-        return Err(StdError::Unauthorized { backtrace: None });
-    }
-
-    if approved == *ZERO_ADDRESS {
-        item.approved = vec![];
-    } else {
-        item.approved.push(approved);
-    }
-
-    // Change approved and save to state
-    state.items[token_id as usize] = item.clone();
-    config(&mut deps.storage).save(&state.clone())?;
-
-    Ok(HandleResponse::default())
-}
-
-/// @notice Enable or disable approval for a third party ("operator") to manage
-///  all of `msg.sender`'s assets
-/// @dev Emits the ApprovalForAll event. The contract MUST allow
-///  multiple operators per owner.
-/// @param _operator Address to add to the set of authorized operators
-/// @param _approved True if the operator is approved, false to revoke approval
-fn set_approval_for_all(operator: CanonicalAddr, approved: bool) {
-    unimplemented!()
-}
-
-/// @notice Get the approved address for a single NFT
-/// @dev Throws if `_tokenId` is not a valid NFT.
-/// @param _tokenId The NFT to find the approved address for
-/// @return The approved address for this NFT, or the zero address if there is none
-fn get_approved(token_id: u32) -> CanonicalAddr {
-    unimplemented!()
-}
-
-/// @notice Query if an address is an authorized operator for another address
-/// @param _owner The address that owns the NFTs
-/// @param _operator The address that acts on behalf of the owner
-/// @return True if `_operator` is an approved operator for `_owner`, false otherwise
-fn is_approved_for_all(owner: CanonicalAddr, operator: CanonicalAddr) -> bool {
-    unimplemented!()
 }
