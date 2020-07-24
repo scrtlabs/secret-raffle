@@ -1,4 +1,12 @@
-# Secret Lottery
+# Secret Raffle
+
+## TESTNET RAFFLE
+
+Post the account you entered with on the rocket.chat channel. We recommend using the account associated with your validator AND adding your validator name with `--memo "name"` when submitting so we can easily identify you. If a winner is selected that was not posted on the rocket.chat, did not have a memo when registering, or is not associated with a validator, a new winner will be selected.
+
+Also, don't spam the contract with random accounts. We know we didn't limit the contract. Thanks:)
+
+The contract address for the testnet is: `TBD`
 
 ## Description
 This is a simple raffle game. The 'Raffle Host' will deploy an instance of this contract. 
@@ -14,9 +22,9 @@ This is only a usage example, and does not imply on how to correctly and safely 
 
 ### As a participant 
 
-Join the raffle:
+#### Join the raffle
 
-To join, you simply submit a `join` transaction, and choose a lucky phrase or number (and keep it secret!) 
+To join, you simply submit a `join` transaction, and choose a lucky phrase or number (and keep it secret!). This will be used as entropy for the required randomness.
 
 ```bash
 secretcli tx compute execute <contract-address> '{ "join": { "phrase": "<write something fun here>" }}' --from account
@@ -27,19 +35,31 @@ For example:
 * right: `"5"` 
 * wrong: `5`
 
+#### Did I join?
+Check if an address was successfully entered in the raffle
+```
+secretcli q compute contract-state smart <contract-address> '{"registered": {"address": "<your address>"}}'
+```
+
+#### See who won
+See who was selected as the winner
+```
+secretcli q compute contract-state smart <contract-address> '{"winner": {}}'
+```
+
 ### As a raffle host
 
-Store the contract on-chain:
+### Store the contract on-chain
 ```bash
 secretcli tx compute store contract.wasm.gz --from account --gas auto
 ```
 
-Instantiate contract:
+#### Instantiate contract
 ```bash
 secretcli tx compute instantiate <code_id> '{"seed": "<some long secret here>"}' --label <label> --from account
 ```
 
-End lottery:
+#### End raffle - will select a winner
 ```bash
 secretcli tx compute execute <contract-address> '{ "end_lottery": {} }' --from account
 ```
