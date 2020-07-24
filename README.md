@@ -27,6 +27,18 @@ For example:
 * right: `"5"` 
 * wrong: `5`
 
+#### Did I join?
+
+```
+secretcli q compute contract-state smart <contract-address> '{"registered": {"address": "<your address>"}}'
+```
+
+#### See who won
+
+```
+secretcli q compute contract-state smart <contract-address> '{"winner": {}}'
+```
+
 ### As a raffle host
 
 ### Store the contract on-chain
