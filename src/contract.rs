@@ -3,6 +3,8 @@ use crate::rand::Prng;
 use crate::msg::{HandleMsg, InitMsg, QueryMsg};
 use crate::state::{config, config_read, State};
 
+use sha2::{Digest, Sha256};
+
 pub fn init<S: Storage, A: Api, Q: Querier>(
     deps: &mut Extern<S, A, Q>,
     env: Env,
@@ -68,9 +70,13 @@ fn register<S: Storage, A: Api, Q: Querier>(
     }
 
     state.items.push(env.message.sender.clone());
-    state.entropy.extend_from_slice(phrase.as_bytes());
-    state.entropy.extend_from_slice(&env.block.height.to_be_bytes());
-    state.entropy.extend_from_slice(&env.block.time.to_be_bytes());
+    state.entropy.extend(phrase.as_bytes());
+    state.entropy.extend(env.message.sender.as_slice().to_vec());
+    state.entropy.extend(env.block.chain_id.as_bytes().to_vec());
+    state.entropy.extend(&env.block.height.to_be_bytes());
+    state.entropy.extend(&env.block.time.to_be_bytes());
+
+    state.entropy = Sha256::digest(&state.entropy).as_slice().to_vec();
 
     // Save state
     config(&mut deps.storage).save(&state)?;
