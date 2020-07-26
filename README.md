@@ -6,7 +6,7 @@ Post the account you entered with on the rocket.chat channel. We recommend using
 
 Also, don't spam the contract with random accounts. We know we didn't limit the contract. Thanks:)
 
-The contract address for the testnet is: `TBD`
+The contract address for the testnet is: `secret1h74ummlyfp6zk0cf3394yx5vn92t37g4h6hjjm`
 
 ## Description
 This is a simple raffle game. The 'Raffle Host' will deploy an instance of this contract. 
