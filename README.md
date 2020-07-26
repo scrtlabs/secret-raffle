@@ -64,4 +64,4 @@ secretcli tx compute instantiate <code_id> '{"seed": "<some long secret here>"}'
 secretcli tx compute execute <contract-address> '{ "end_lottery": {} }' --from account
 ```
 
-For more details, check out the [messages module](https://github.com/toml01/SecretLottery/blob/master/src/msg.rs).
+For more details, check out the [messages module](https://github.com/enigmampc/secret-raffle/blob/master/src/msg.rs).
