@@ -65,3 +65,9 @@ secretcli tx compute execute <contract-address> '{ "end_lottery": {} }' --from a
 ```
 
 For more details, check out the [messages module](https://github.com/enigmampc/secret-raffle/blob/master/src/msg.rs).
+
+### Troubleshooting 
+
+All transactions are encrypted, so if you want to see the error returned by a failed transaction, you need to use the command
+
+`secretcli q compute tx <TX_HASH>`
