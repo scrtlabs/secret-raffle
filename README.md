@@ -38,13 +38,13 @@ For example:
 #### Did I join?
 Check if an address was successfully entered in the raffle
 ```
-secretcli q compute contract-state smart <contract-address> '{"registered": {"address": "<your address>"}}'
+secretcli q compute contract query <contract-address> '{"registered": {"address": "<your address>"}}'
 ```
 
 #### See who won
 See who was selected as the winner
 ```
-secretcli q compute contract-state smart <contract-address> '{"winner": {}}'
+secretcli q compute contract query <contract-address> '{"winner": {}}'
 ```
 
 ### As a raffle host
