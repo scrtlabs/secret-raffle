@@ -38,7 +38,7 @@ For example:
 #### Did I join?
 Check if an address was successfully entered in the raffle
 ```
-secretcli q compute query <contract-address> '{"registered": {"address": "<your address>"}}'
+secretcli q compute query <contract-address> '{"joined": {"address": "<your address>"}}'
 ```
 
 #### See who won
