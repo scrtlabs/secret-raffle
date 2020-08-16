@@ -4,8 +4,6 @@
 
 Post the account you entered with on the rocket.chat channel. We recommend using the account associated with your validator AND adding your validator name with `--memo "name"` when submitting so we can easily identify you. If a winner is selected that was not posted on the rocket.chat, did not have a memo when registering, or is not associated with a validator, a new winner will be selected.
 
-Also, don't spam the contract with random accounts. We know we didn't limit the contract. Thanks:)
-
 The contract address for the testnet is: `TBD`
 
 ## Description
