@@ -27,7 +27,7 @@ impl Prng {
             return 0
         }
 
-        return from + (self.rand_u32() % to)
+        return from + (self.rand_u32() % (to - from + 1))
     }
 
     /// Return an item from an iterable structure

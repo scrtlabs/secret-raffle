@@ -28,6 +28,9 @@ pub enum QueryMsg {
     Joined {
         address: HumanAddr,
     },
-    Winner {}
+    Winner {},
+    Whitelisted {
+        address: HumanAddr,
+    },
 }
 

@@ -135,7 +135,8 @@ pub fn query<S: Storage, A: Api, Q: Querier>(
 ) -> StdResult<Binary> {
     match msg {
         QueryMsg::Joined { address } => query_registered(deps, address),
-        QueryMsg::Winner {} => query_winner(deps)
+        QueryMsg::Winner {} => query_winner(deps),
+        QueryMsg::Whitelisted {address} => query_whitelist(deps, address),
     }
 }
 
@@ -173,7 +174,11 @@ fn register<S: Storage, A: Api, Q: Querier>(
     // Save state
     config(&mut deps.storage).save(&state)?;
 
-    Ok(HandleResponse::default())
+    Ok(HandleResponse {
+        messages: vec![],
+        log: vec![],
+        data: Some(Binary(Vec::from("Registered successfully!")))
+    })
 }
 
 fn query_registered<S: Storage, A: Api, Q: Querier>(
@@ -191,16 +196,46 @@ fn query_registered<S: Storage, A: Api, Q: Querier>(
     }
 }
 
+fn query_whitelist<S: Storage, A: Api, Q: Querier>(
+    deps: &Extern<S, A, Q>,
+    address: HumanAddr,
+) -> StdResult<QueryResponse> {
+    let state = config_read(&deps.storage).load()?;
+
+    let addr = deps.api.canonical_address(&address)?;
+
+    if state.whitelist.contains(&addr) {
+        Ok(Binary(Vec::from(format!("{} is whitelisted", address))))
+    } else {
+        Ok(Binary(Vec::from(format!("{} is not whitelisted", address))))
+    }
+}
+
 fn query_winner<S: Storage, A: Api, Q: Querier>(
     deps: &Extern<S, A, Q>,
 ) -> StdResult<QueryResponse> {
     let state = config_read(&deps.storage).load()?;
 
-    if state.winner1 != CanonicalAddr::default() {
-        let winner1 = deps.api.human_address(&state.winner1)?;
-        let winner2 = deps.api.human_address(&state.winner2)?;
-        let winner3 = deps.api.human_address(&state.winner3)?;
-        Ok(Binary(Vec::from(format!("1st place: {}\n2nd place:{}\n3rd place: {}", winner1, winner2, winner3))))
+    let w1 = if state.winner1 != CanonicalAddr::default() {
+        deps.api.human_address(&state.winner1)?.to_string()
+    } else {
+        "not selected".to_string()
+    };
+
+    let w2 = if state.winner2 != CanonicalAddr::default() {
+        deps.api.human_address(&state.winner2)?.to_string()
+    } else {
+        "not selected".to_string()
+    };
+
+    let w3 = if state.winner3 != CanonicalAddr::default() {
+        deps.api.human_address(&state.winner3)?.to_string()
+    } else {
+        "not selected".to_string()
+    };
+
+    if state.winner1 != CanonicalAddr::default() || state.winner2 != CanonicalAddr::default() || state.winner3 != CanonicalAddr::default() {
+        Ok(Binary(Vec::from(format!("1st place: {}\n2nd place: {}\n3rd place: {}", w1, w2, w3))))
     } else {
         Ok(Binary(Vec::from(format!("Winner not selected yet!"))))
     }
@@ -223,6 +258,8 @@ fn add_to_whitelist<S: Storage, A: Api, Q: Querier>(
     for x in i {
         state.whitelist.push(deps.api.canonical_address(x)?)
     }
+
+    config(&mut deps.storage).save(&state)?;
 
     Ok(HandleResponse::default())
 }
@@ -259,15 +296,17 @@ fn end_lottery<S: Storage, A: Api, Q: Querier>(
         return Err(throw_gen_err(format!("Fucking address is empty wtf")));
     }
 
+    let unwrapped = winner.unwrap();
+
     match winner_to_select {
         1 => {
-            state.winner1 =  winner.unwrap().clone();
+            state.winner1 =  (&unwrapped).clone();
         },
         2 => {
-            state.winner2 =  winner.unwrap().clone();
+            state.winner2 =  (&unwrapped).clone();
         },
         3 => {
-            state.winner3 =  winner.unwrap().clone();
+            state.winner3 =  (&unwrapped).clone();
         },
         _ => {
             return Err(throw_gen_err(format!("bad winner selection")));
@@ -276,7 +315,7 @@ fn end_lottery<S: Storage, A: Api, Q: Querier>(
 
     config(&mut deps.storage).save(&state)?;
 
-    let winner_readable = deps.api.human_address(&state.winner)?;
+    let winner_readable = deps.api.human_address(&unwrapped)?;
 
     Ok(HandleResponse {
         messages: vec![],
