@@ -13,7 +13,12 @@ pub enum HandleMsg {
     Join {
         phrase: String,
     },
-    EndLottery {},
+    EndLottery {
+        winner_to_select: u8,
+    },
+    AddToWhitelist {
+        addresses: Vec<HumanAddr>
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

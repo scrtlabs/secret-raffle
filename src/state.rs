@@ -9,11 +9,15 @@ pub static CONFIG_KEY: &[u8] = b"config";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
     pub items: Vec<CanonicalAddr>,
+    pub whitelist: Vec<CanonicalAddr>,
     pub contract_owner: CanonicalAddr,
     pub seed: Vec<u8>,
     pub entropy: Vec<u8>,
     pub start_time: u64,
-    pub winner: CanonicalAddr
+    pub winner: CanonicalAddr,
+    pub winner1: CanonicalAddr,
+    pub winner2: CanonicalAddr,
+    pub winner3: CanonicalAddr
 }
 
 pub fn config<S: Storage>(storage: &mut S) -> Singleton<S, State> {
