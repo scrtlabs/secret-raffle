@@ -35,6 +35,12 @@ For example:
 * right: `"5"` 
 * wrong: `5`
 
+#### Am I whitelisted?
+Check if an address is whitelisted for the raffle
+```
+secretcli q compute query <contract-address> '{"whitelisted": {"address": "<your address>"}}'
+```
+
 #### Did I join?
 Check if an address was successfully entered in the raffle
 ```
