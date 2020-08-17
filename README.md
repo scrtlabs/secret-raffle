@@ -13,9 +13,6 @@ Anyone can join the raffle, by submitting a transaction from their account. Each
 
 When the raffle host decides to end the raffle, a winner will be chosen at random from all the accounts that registered
 
-## Disclaimer
-This is only a usage example, and does not imply on how to correctly and safely use or write `Secret Contracts`. You should always make sure to read and understand `Secret Contract` API's disclaimers and limitations before deploying a contract in production!
-
 ## Usage
 
 ### As a participant 
