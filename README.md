@@ -4,7 +4,7 @@
 
 Post the account you entered with on the rocket.chat channel. We recommend using the account associated with your validator AND adding your validator name with `--memo "name"` when submitting so we can easily identify you. If a winner is selected that was not posted on the rocket.chat, did not have a memo when registering, or is not associated with a validator, a new winner will be selected.
 
-The contract address for the testnet is: `TBD`
+The contract address for the testnet is: `secret1jjwx5eyaz4e4h7w0jyz0dad8e2wm73d8dwkr8c` or label `raffle`
 
 ## Description
 This is a simple raffle game. The 'Raffle Host' will deploy an instance of this contract. 
@@ -25,7 +25,7 @@ This is only a usage example, and does not imply on how to correctly and safely 
 To join, you simply submit a `join` transaction, and choose a lucky phrase or number (and keep it secret!). This will be used as entropy for the required randomness.
 
 ```bash
-secretcli tx compute execute <contract-address> '{ "join": { "phrase": "<write something fun here>" }}' --from account
+secretcli tx compute execute '{ "join": { "phrase": "<write something fun here>" }}' --from account --label raffle
 ```
 
 `phrase` is expected to be a string, so choose whatever you want as long as you don't forget to surround it by double quotes
@@ -65,7 +65,7 @@ secretcli tx compute instantiate <code_id> '{"seed": "<some long secret here>"}'
 
 #### End raffle - will select a winner
 ```bash
-secretcli tx compute execute <contract-address> '{ "end_lottery": {} }' --from account
+secretcli tx compute execute <contract-address> '{ "end_lottery": {"winner_to_select": <1-3>} }' --from account
 ```
 
 For more details, check out the [messages module](https://github.com/enigmampc/secret-raffle/blob/master/src/msg.rs).
