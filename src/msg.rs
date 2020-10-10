@@ -10,12 +10,7 @@ pub struct InitMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
-    Join {
-        phrase: String,
-    },
-    EndLottery {
-        winner_to_select: u8,
-    },
+    EndLottery {},
     AddToWhitelist {
         addresses: Vec<HumanAddr>
     }
@@ -29,8 +24,8 @@ pub enum QueryMsg {
         address: HumanAddr,
     },
     Winner {},
-    Whitelisted {
-        address: HumanAddr,
-    },
+    // Whitelisted {
+    //     address: HumanAddr,
+    // },
 }
 
